@@ -1,0 +1,15 @@
+---
+title: first post 第一次发帖
+author: Kili
+date: '2023-11-09'
+slug: first-post
+categories: []
+tags:
+  - plot
+---
+
+Just a test!If you are seeing this post,wish you have a good day!I  build up this website via [blogdown](https://bookdown.org/yihui/blogdown).
+
+Good luck!
+
+![](images/91775050_p0.png)
