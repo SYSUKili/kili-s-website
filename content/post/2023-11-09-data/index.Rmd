@@ -1,0 +1,11 @@
+---
+title: data关于商场的数据分析报告
+author: Kili
+date: '2023-11-09'
+slug: data
+categories: []
+tags:
+  - R
+---
+
+先留个坑
