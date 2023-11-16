@@ -1,0 +1,23 @@
+---
+title: matrix一道循环矩阵的题目
+author: Kili
+date: '2023-11-11'
+slug: matrix
+categories: []
+tags:
+  - latex
+---
+
+今天数学竞赛碰上这么一道题目，当时没做出来，现在来解答一下。
+
+$$
+ \begin{equation}
+ \left[
+ \begin{array}{}
+     a_{11} & a_{12} & a_{13} \\
+     a_{21} & a_{22} & a_{23} \\
+     a_{31} & a_{32} & a_{33} 
+ \end{array}
+ \right]        
+ \end{equation}
+$$
