@@ -1,0 +1,14 @@
+---
+title: shiny(可互动)
+author: kili
+date: '2023-12-05'
+slug: shiny
+categories: []
+tags:
+  - shiny
+  - R
+---
+
+一个shiny小程序
+!(可互动)[https://sysukili.shinyapps.io/test/]
+
