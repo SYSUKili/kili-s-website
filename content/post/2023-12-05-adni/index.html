@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="" xml:lang="">
+  <head>
+    <title>基于ADNI数据集的建模尝试</title>
+    <meta charset="utf-8" />
+    <meta name="author" content="小组10:陈区" />
+    <script src="libs/header-attrs/header-attrs.js"></script>
+    <link rel="stylesheet" href="xaringan-themer.css" type="text/css" />
+  </head>
+  <body>
+    <textarea id="source">
+class: center, middle, inverse, title-slide
+
+.title[
+# 基于ADNI数据集的建模尝试
+]
+.author[
+### 小组10:陈区
+]
+.institute[
+### ADNI R
+]
+.date[
+### 2023/12/19
+]
+
+---
+
+
+
+
+
+
+# 建模流程
+
+1. 数据清洗；
+
+1. 变量相关性诊断；
+
+1. 确定数据集与解释变量；
+
+1. 模型改善与选择；
+
+1. 模型确认
+
+
+
+---
+class: center, middle
+
+# 数据清洗（基于tidyverse）
+
+
+---
+
+首先，我创建了一个shiny小程序&lt;sup&gt;*&lt;/sup&gt;用于数据预览：[data](https://sysukili.shinyapps.io/ADNI/)
+
+.footnote[[*] 一种实时运算的可互动网页端程序，下面我还将用它来制作一个基于回归模型的阿兹海默自测小程序。]
+
+--
+
+先用`dplyr::glimpse(d)`显示数据框的大小、各列变量名、类型
+
+给出的三个数据集我们需要找到'关键词'进行合并，通过查找资料可知'RID'代表病人个体，故可通过以下代码连接表格：
+
+```
+d =d1 %&gt;% 
+* inner_join(d2, join_by(RID)) %&gt;% inner_join(d3, join_by(RID)) 
+```
+--
+
+
+注意到表格缺少年龄变量，但我们拥有出生年份与检测日期，首先提取出检测年份：
+
+
+```r
+library (lubridate)
+*d1$EXAMDATE &lt;- year( ymd (d1$EXAMDATE))
+d1$EXAMDATE[c(1,2,3)]
+```
+
+```
+## [1] 2018 2015 2018
+```
+
+--
+
+然后可通过`mutate()`添加：
+
+
+```r
+d &lt;- d %&gt;% 
+*  mutate(AGE=EXAMDATE-PTDOBYY )
+```
+
+
+
+---
+# 变量选择
+
+此时由于申请到了`ADNI`&lt;sup&gt;*&lt;/sup&gt;的官方数据，不妨直接用官方数据进行清洗：
+
+
+```r
+library(ADNIMERGE)
+data(adnimerge)
+```
+
+
+.footnote[[*] ADNI:一个针对阿兹海默病人的数据收集并开源的研究项目。]
+
+--
+
+
+用`select()`选择一些想用的变量：
+
+
+```r
+adnimerge$AGE=adnimerge$AGE+adnimerge$Years.bl
+adnimerge &lt;- adnimerge %&gt;% select(RID,DX,PTGENDER,PTMARRY,AGE,PTEDUCAT,MOCA
+                          ,MMSE,APOE4,ICV,FDG,ABETA,TAU,PTAU)
+```
+
+--
+
+```r
+colSums(is.na(adnimerge))
+```
+
+```
+##      RID       DX PTGENDER  PTMARRY      AGE PTEDUCAT     MOCA     MMSE 
+##        0     4969        0        1        9        0     9003     4959 
+##    APOE4      ICV      FDG    ABETA      TAU     PTAU 
+##       97     6323    12746    14067    14067    14067
+```
+
+---
+
+可以看到其中有很多空缺值NA，解决方法：
+
+- 用`fill()`填补：
+
+
+```r
+adnimerge &lt;- adnimerge%&gt;%  fill(DX) %&gt;%  fill(AGE) %&gt;% fill(APOE4) 
+```
+
+
+- 删除
+
+
+```r
+for (i in min(adnimerge$RID):max(adnimerge$RID))
+{
+  if (sum(!is.na((adnimerge %&gt;% filter(RID==i))$MOCA))==0)
+    adnimerge &lt;- adnimerge %&gt;% filter(RID!=i)
+}
+...以此类推
+```
+
+
+
+
+- 再填补 
+
+
+```r
+adnimerge &lt;- adnimerge %&gt;%fill(MOCA,.direction="up")%&gt;%   fill(MOCA) %&gt;% fill(MMSE) %&gt;% fill(ICV) %&gt;% fill(APOE4) %&gt;% fill(FDG)  %&gt;%   fill(ABETA) %&gt;% fill(TAU) %&gt;% fill(PTAU)
+```
+
+再看看：
+
+
+```
+##      RID       DX PTGENDER  PTMARRY      AGE PTEDUCAT     MOCA     MMSE 
+##        0        0        0        0        0        0        0        0 
+##    APOE4      ICV      FDG    ABETA      TAU     PTAU 
+##        0        0        0        0        0        0
+```
+
+
+---
+
+DX调整为有序水平：
+
+
+```r
+adnimerge$DX=factor(adnimerge$DX,labels=c('CN','MCI','Dementia'),ordered=TRUE)
+```
+
+注意到ABETA中的&gt;1700,&lt;200  PTAU的&lt;8：
+
+
+```r
+adnimerge$ABETA[adnimerge$ABETA=="&gt;1700"]=ceiling(runif(1000,1700,2000))
+adnimerge$ABETA[adnimerge$ABETA=="&lt;200"]=ceiling(runif(5,100,200))
+adnimerge$PTAU[adnimerge$PTAU=="&lt;8"]=ceiling(runif(100,5,8))
+adnimerge &lt;- drop_na(adnimerge,ABETA)
+adnimerge &lt;- drop_na(adnimerge,TAU)
+adnimerge &lt;- drop_na(adnimerge,PTAU)
+```
+
+
+将清洗完毕的数据集随机分为训练集与测试集：
+
+
+```r
+index &lt;-  sort(sample(nrow(adnimerge), nrow(adnimerge)*.95))
+train &lt;- adnimerge[index,]
+test&lt;-  adnimerge[-index,]
+```
+
+将处理好的数据集储存下来：
+
+
+```r
+write.csv(adnimerge,file="ADNI_final.csv")
+write.csv(train,file="ADNI_train.csv")
+write.csv(test,file="ADNI_test.csv")
+```
+
+
+---
+
+
+既然数据已经清洗完毕，那我也抛砖引玉用`glm()`&lt;sup&gt;*&lt;/sup&gt;尝试建模。
+
+.footnote[[*] 逻辑斯谛回归。]
+
+
+```r
+train$DX=factor(train$DX)
+fit &lt;- glm(DX~MOCA+MMSE+APOE4+ICV+FDG+ABETA+
+                   TAU+PTAU+PTGENDER+AGE+PTEDUCAT,
+            family = binomial,data=train)
+fit
+```
+
+```
+## 
+## Call:  glm(formula = DX ~ MOCA + MMSE + APOE4 + ICV + FDG + ABETA + 
+##     TAU + PTAU + PTGENDER + AGE + PTEDUCAT, family = binomial, 
+##     data = train)
+## 
+## Coefficients:
+##  (Intercept)          MOCA          MMSE         APOE4           ICV  
+##    2.224e+01    -1.865e-01    -3.877e-01     9.098e-02     4.373e-07  
+##          FDG         ABETA           TAU          PTAU  PTGENDERMale  
+##   -7.094e-01    -5.033e-04     4.235e-03    -2.389e-02     3.108e-01  
+##          AGE      PTEDUCAT  
+##   -8.003e-02    -1.099e-02  
+## 
+## Degrees of Freedom: 8322 Total (i.e. Null);  8311 Residual
+##   (因为不存在，6个观察量被删除了)
+## Null Deviance:	    11000 
+## Residual Deviance: 8000 	AIC: 8024
+```
+
+
+
+
+---
+
+
+
+
+```r
+pre=predict(fit,test,type="response")
+pre[c(1,2,3,4,5)]
+```
+
+
+
+最后给出一个基于该模型可以自测认知水平的shiny小程序:[cognition test](https://sysukili.shinyapps.io/cognitiontest/)
+
+---
+
+
+class: center, middle
+
+# 数据可视化（基于ggplot2）
+
+---
+
+
+
+```r
+ddstab &lt;- cdf_table(d$DX)
+p &lt;- ggplot(data = ddstab, mapping = aes(
+  x = 1, y = freq, fill = x ))
+p + geom_col() +
+  coord_polar(theta = "y") +
+  scale_x_continuous(name = NULL, breaks = NULL) +
+  scale_y_continuous(name = NULL, breaks = NULL) +
+  labs(fill = "DX")
+```
+
+
+
+&lt;img src="demo_files/figure-html/unnamed-chunk-21-1.png" width="100%" /&gt;
+
+---
+
+
+```r
+ggplot(d)+
+  geom_bar(mapping=aes(x=PTGENDER,fill=PTGENDER))+
+  facet_wrap(~DX)+
+  labs(title = "性别分布",
+    tag = "条形图",
+    caption = "数据来源：ADNI")+
+*  scale_fill_npg()
+```
+
+&lt;img src="demo_files/figure-html/unnamed-chunk-22-1.png" width="100%" /&gt;
+
+
+
+
+
+
+
+---
+
+
+```r
+ggplot(d,aes(DX,ABETA))+
+  geom_boxplot(mapping=aes(fill=DX))+
+  geom_jitter(aes(fill=DX),width =0.2,shape = 21,size=0.2)+
+  theme_bw() + 
+  theme(panel.grid.major =element_blank(), 
+        panel.grid.minor = element_blank(),
+        panel.background = element_blank(),
+        axis.line = element_line(colour = "black"))+
+  scale_fill_npg()+
+  ggtitle("ABETA箱型图")
+```
+
+&lt;img src="demo_files/figure-html/unnamed-chunk-23-1.png" width="100%" /&gt;
+
+
+
+
+
+---
+class: center, middle
+
+# Thanks!
+
+Slides created via the R packages:
+
+[**xaringan**](https://github.com/yihui/xaringan)&lt;br&gt;
+[gadenbuie/xaringanthemer](https://github.com/gadenbuie/xaringanthemer)
+
+The chakra comes from [remark.js](https://remarkjs.com), [**knitr**](http://yihui.name/knitr), and [R Markdown](https://rmarkdown.rstudio.com).
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+<script>var slideshow = remark.create({
+"highlightStyle": "github",
+"highlightLines": true,
+"countIncrementalSlides": false
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();
+// add `data-at-shortcutkeys` attribute to <body> to resolve conflicts with JAWS
+// screen reader (see PR #262)
+(function(d) {
+  let res = {};
+  d.querySelectorAll('.remark-help-content table tr').forEach(tr => {
+    const t = tr.querySelector('td:nth-child(2)').innerText;
+    tr.querySelectorAll('td:first-child .key').forEach(key => {
+      const k = key.innerText;
+      if (/^[a-z]$/.test(k)) res[k] = t;  // must be a single letter (key)
+    });
+  });
+  d.body.setAttribute('data-at-shortcutkeys', JSON.stringify(res));
+})(document);
+(function() {
+  "use strict"
+  // Replace <script> tags in slides area to make them executable
+  var scripts = document.querySelectorAll(
+    '.remark-slides-area .remark-slide-container script'
+  );
+  if (!scripts.length) return;
+  for (var i = 0; i < scripts.length; i++) {
+    var s = document.createElement('script');
+    var code = document.createTextNode(scripts[i].textContent);
+    s.appendChild(code);
+    var scriptAttrs = scripts[i].attributes;
+    for (var j = 0; j < scriptAttrs.length; j++) {
+      s.setAttribute(scriptAttrs[j].name, scriptAttrs[j].value);
+    }
+    scripts[i].parentElement.replaceChild(s, scripts[i]);
+  }
+})();
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+// adds .remark-code-has-line-highlighted class to <pre> parent elements
+// of code chunks containing highlighted lines with class .remark-code-line-highlighted
+(function(d) {
+  const hlines = d.querySelectorAll('.remark-code-line-highlighted');
+  const preParents = [];
+  const findPreParent = function(line, p = 0) {
+    if (p > 1) return null; // traverse up no further than grandparent
+    const el = line.parentElement;
+    return el.tagName === "PRE" ? el : findPreParent(el, ++p);
+  };
+
+  for (let line of hlines) {
+    let pre = findPreParent(line);
+    if (pre && !preParents.includes(pre)) preParents.push(pre);
+  }
+  preParents.forEach(p => p.classList.add("remark-code-has-line-highlighted"));
+})(document);</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>
