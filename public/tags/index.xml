@@ -6,12 +6,19 @@
     <description>Recent content in Tags on Just a Blog</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-US</language>
-    <lastBuildDate>Tue, 05 Dec 2023 00:00:00 +0000</lastBuildDate>
+    <lastBuildDate>Mon, 01 Jan 2024 00:00:00 +0000</lastBuildDate>
     <atom:link href="/tags/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>non-peremetric</title>
+      <link>/tags/non-peremetric/</link>
+      <pubDate>Mon, 01 Jan 2024 00:00:00 +0000</pubDate>
+      <guid>/tags/non-peremetric/</guid>
+      <description></description>
+    </item>
     <item>
       <title>R</title>
       <link>/tags/r/</link>
-      <pubDate>Tue, 05 Dec 2023 00:00:00 +0000</pubDate>
+      <pubDate>Mon, 01 Jan 2024 00:00:00 +0000</pubDate>
       <guid>/tags/r/</guid>
       <description></description>
     </item>

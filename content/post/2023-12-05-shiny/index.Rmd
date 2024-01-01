@@ -8,8 +8,18 @@ tags:
   - shiny
   - R
 ---
-[一个可互动shiny小程序](https://sysukili.shinyapps.io/ADNI/)
+
+- shiny apps：
+
+[数据集](https://sysukili.shinyapps.io/ADNI/)
+
+[认知测试](https://sysukili.shinyapps.io/cognitiontest/)
+
+[可视化](https://sysukili.shinyapps.io/visual/)
+
+
 ![](images/112874481_p0_master1200.jpg)
+
 
 
 
